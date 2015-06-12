@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>D3 Playground</title>
+  <meta name="description" content="some expetiments">
+  <meta name="author" content="Tsukihara Caligin">
+
+<style>
+
+.link {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5px;
+  stroke: blue;
+}
+
+#licensing {
+  fill: green;
+}
+
+.link.licensing {
+  stroke: green;
+}
+
+.link.resolved {
+  stroke-dasharray: 0,2 1;
+}
+
+circle {
+  fill: #ccc;
+  stroke: #333;
+  stroke-width: 1.5px;
+}
+
+text {
+  font: 10px sans-serif;
+  pointer-events: none;
+  text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+}
+
+</style>
+  <link rel="stylesheet" href="index.css">
+
+  <script src="lib/d3.js" charset="utf-8"></script>
+  <script>
+  var workflowDefinition = {
+    s1: {
+      label: 'start',
+      next: [2],
+      data: {
+        dummyLabel: ['1']
+      }
+    },
+    s2: {
+      label: 'client request',
+      next: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 10],
+      data: {
+        dummyLabel: ['2']
+      } 
+    },
+    s3: {
+      label: 'line check',
+      next: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 10],
+      data: {
+        dummyLabel: ['3']
+      } 
+    },
+    s4: {
+      label: 'tech on site',
+      next: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 2, 10],
+      data: {
+        dummyLabel: ['4']
+      } 
+    },
+    s5: {
+      label: 'line provisioning',
+      next: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 4, 4, 10],
+      data: {
+        dummyLabel: ['5']
+      } 
+    },
+    s6: {
+      label: 'send equipment',
+      next: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6],
+      data: {
+        dummyLabel: ['6']
+      } 
+    },
+    s7: {
+      label: 'equipment connected',
+      next: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4, 4, 5],
+      data: {
+        dummyLabel: ['7']
+      } 
+    },
+    s8: {
+      label: 'line testing',
+      next: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8],
+      data: {
+        dummyLabel: ['8']
+      } 
+    },
+    s9: {
+      label: 'line calibration',
+      next: [10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      data: {
+        dummyLabel: ['9']
+      } 
+    },
+    s10: {
+      label: 'end',
+      next: [],
+      data: {
+        dummyLabel: ['10']
+      } 
+    }
+  };
+
+function nextStep(workflowState) {
+  var index = Math.floor(Math.random() * workflowState.next.length );
+  return 's' + workflowState.next[index];
+};
+
+function* workflowGenerator(){
+  var current = workflowDefinition['s1'];
+  while(current.next.length !== 0){
+    yield current;
+    current = workflowDefinition[nextStep(current)];
+  }
+  yield current;
+};
+function* workflows(){
+  while(true){
+    var instance = [];
+    for(var step of workflowGenerator()){
+      instance.push(step);
+    }
+    yield instance;
+  }
+};
+  </script>
+</head>
+
+<body>
+    <script>
+function inferLinkId(journey, index){
+  return journey[index].label + "-" + journey[index+1].label;
+}
+
+var journeys = [];
+var wfs = workflows();
+for(var i = 0; i !== 10; ++i){
+  journeys.push(wfs.next().value);
+}
+
+console.log(journeys)
+
+var nodes = {};
+var linksIndexed = {};
+var links = [];
+
+journeys.forEach(function(journey){
+  journey.forEach(function(task, index){
+    nodes[task.label] || (nodes[task.label] = {instances: [], name: task.label});
+    nodes[task.label].instances.push(task);
+    if(index !== journey.length-1){
+      var linkId = inferLinkId(journey, index);
+      linksIndexed[linkId] || (linksIndexed[linkId] = {count: 0});
+      linksIndexed[linkId].count = linksIndexed[linkId].count +1;
+    }
+  });
+});
+
+for(var linkId in linksIndexed){
+  links.push({
+    source: nodes[linkId.split("-")[0]],
+    target: nodes[linkId.split("-")[1]],
+    count: linksIndexed[linkId].count
+  });
+}
+
+var width = 1800,
+    height = 900;
+
+var force = d3.layout.force()
+    .nodes(d3.values(nodes))
+    .links(links)
+    .size([width, height])
+    .linkDistance(300)
+    .charge(-1800)
+    .on("tick", tick)
+    .start();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+
+//cheating.....
+svg.append("defs").selectAll("marker")
+    .data(["suit", "licensing", "resolved"])
+  .enter().append("marker")
+    .attr("id", function(d) { return d; })
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 15)
+    .attr("refY", -1.5)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M0,-5L10,0L0,5");
+
+
+var path = svg.append("g").selectAll("path")
+    .data(force.links())
+  .enter().append("path")
+    .attr("class", function(d) { return "link "; })
+    .style("stroke-width", function(d) { return d.count;})
+    .attr("marker-end", function(d) { return "url(#suit)"; }); //cheating
+
+var circle = svg.append("g").selectAll("circle")
+    .data(force.nodes())
+  .enter().append("circle")
+    .attr("r", function(d){ return d.instances.length * 3})
+    .style("fill", function(d){
+      return "rgb("+(d.instances.length*10)+","+(255-d.instances.length*10)+",0)"
+    })
+    .call(force.drag);
+    //.attr("r", function(d) { return d.instances.length * 3; })
+
+var text = svg.append("g").selectAll("text")
+    .data(force.nodes())
+  .enter().append("text")
+    .attr("x", 8)
+    .attr("y", ".31em")
+    .text(function(d) { return d.name; });
+
+// Use elliptical arc path segments to doubly-encode directionality.
+function tick() {
+  path.attr("d", linkArc);
+  circle.attr("transform", transform);
+  text.attr("transform", transform);
+}
+
+function linkArc(d) {
+  var dx = d.target.x - d.source.x,
+      dy = d.target.y - d.source.y,
+      dr = Math.sqrt(dx * dx + dy * dy);
+  return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+}
+
+function transform(d) {
+  return "translate(" + d.x + "," + d.y + ")";
+}
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "d3-spikes",
+  "version": "0.0.0",
+  "authors": [
+    "Tsukihara Caligin <caligin35@gmail.com>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "d3": "~3.5.5"
+  }
+}
